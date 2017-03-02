@@ -1,0 +1,39 @@
+---
+
+# Build EC2 instances.
+
+# TO DO: Try to use envars, then use auth.yml vars file if not defined
+# Uncomment the two lines below if using ENV VARS for AWS auth
+# Requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY envars be defined
+#- set_fact: aws_auth.access_key= "{{ lookup('ENV', 'AWS_ACCESS_KEY') }}"
+#- set_fact: aws_auth.secret_key= "{{ lookup('ENV', 'AWS_SECRET_KEY') }}"
+
+- name: Load AWS authentication values from encrypted 'auth.yml' file
+  include_vars:
+    file: auth.yml
+    name: aws_auth
+
+- set_fact: build_user= "{{ lookup{'ENV', 'USER') }}"
+- set_fact: build_date= "{{ lookup{'pipe', 'date +%Y%m%d%H%M%S') }}"
+
+- fail: msg="No AWS keys loaded -- check AWS_ACCESS_KEY and AWS_SECRET_KEY defined" 
+  when: aws_auth.access_key == "" and aws_auth.secret_key == ""
+
+- name: Launching EC2 instance(s)
+  ec2:
+    instance_type: "{{ instance_type }}" 
+    image: "{{ ami }}" 
+    key_name: "{{ pem }}" 
+    exact_count: "{{ count }}" 
+    group: "{{ security_group }}" 
+    wait: True
+    vpc_subnet_id: "{{ vpc_subnet_id }}" 
+    aws_access_key: "{{ aws_auth.access_key }}" 
+    aws_secret_key: "{{ aws_auth.secret_key }}" 
+    count_tag:
+      Name: Test
+    instance_tag:
+      Name: Test
+  register: ec2
+
+

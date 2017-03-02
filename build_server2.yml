@@ -1,0 +1,22 @@
+---
+
+- hosts: localhost
+  connection: local
+  gather_facts: False
+
+  tasks:
+
+    - name: Provision a set of instances
+      ec2:
+         key_name: ansible-key
+         instance_type: t2.micro
+         image: ami-b63769a1 
+         wait: true
+         exact_count: "{{ exact_count }}"
+         count_tag:
+            Name: Demo
+         instance_tags:
+            Name: Demo
+         vpc_subnet_id: subnet-f3653bba  
+         region: us-east-1
+      register: ec2

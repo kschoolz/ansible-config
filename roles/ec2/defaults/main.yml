@@ -1,0 +1,9 @@
+---
+
+instance_type: t2.micro
+ami: ami-b63769a1
+pem: ansible_key
+count: 1
+security_group: launch-wizard-2
+vpc_subnet_id: subnet-f3653bba 
+
