@@ -1,0 +1,5 @@
+---
+
+- name: Add ansible-ssh-config to allow Ansible to manage SSH config file
+  src: gaqzi.ssh-config
+  path: library/

@@ -1,0 +1,27 @@
+---
+
+- name: Provision instances in AWS
+  host: localhost
+  connection: local
+  gather_facts: False
+
+  # load AWS variables from group vars file
+  vars_files:
+  - group_vars/all
+
+  tasks:
+  - name: Launch internal DNS servers
+    ec2:
+      key_name: ansible-key
+      instance_type: t2.micro
+      image:  ami-b63769a1
+      wait: true
+      exact_count: 2
+      count_tag:
+        Name: internaldns
+      instance_tags:
+        Name: internaldns
+    register: internaldns
+
+  - name: Add all instance 
+  

@@ -1,0 +1,61 @@
+---
+- name: VPC | Create AWS VPC
+  local_aciton:
+    module: ec2_vpc_net
+    name: "{{ vpc_name }}"
+    region: "{{ vpc_region }}"
+    state: present
+    cidr_block: "{{ vpc_cidr_block }}"
+    region: "{{ vpc_region }}"
+    tags: { "Name":"{{ vpc_name }}" }
+    tenacy: default
+  register: vpc
+
+- name: VPC | Set up private subnet
+  local_action:
+    module: ec2_vpc_subnet
+    state: present
+    vpc_id: "{{ vpc.vpc_id }}"
+    cidr: "{{ private_subnet_cidr }}"
+    tags:
+      Name: "privatesubnet"
+  register: privatesubnet
+
+- name: VPC | Set up public subnet
+  local_action:
+    module: ec2_vpc_subnet
+    state: present
+    vpc_id: "{{ vpc.vpc_id }}"
+    cidr: "{{ public_subnet_cidr }}"
+    tags:
+      Name: "publicsubnet"
+  register: publicsubnet
+
+- name: VPC | Add internet gateway
+  local_action:
+    module: ec2_vpc_igw
+    state: present
+    vpc_id: "{{ vpc.vpc_id }}"
+  register igw
+
+- name: VPC | Add Public subnet route table
+  local_action:
+    module: ec2_vpc_route_table
+    state: present
+    vpc_id: "{{ vpc.vpc_id }}"
+    tags:
+      Name: public
+    subnets: "{{ publicsubnet.subnet_id }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ igw.gateway_id }}"
+  register: publicroutetable
+
+- name: VPC | Create NAT gateway
+  local_action:
+    module: ec2_vpc_nat_gateway
+    state: present
+    subnet_id: "{{ privatesubnet.subnet_id }}"
+    wait: yes
+    if_exists_do_not_create: true
+    
