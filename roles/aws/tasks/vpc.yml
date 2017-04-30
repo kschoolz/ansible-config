@@ -18,7 +18,7 @@
     vpc_id: "{{ vpc.vpc_id }}"
     cidr: "{{ private_subnet_cidr }}"
     tags:
-      Name: "privatesubnet"
+      Name: "{{ vpc_name }}-private-subnet"
   register: privatesubnet
 
 - name: VPC | Set up public subnet
@@ -28,7 +28,7 @@
     vpc_id: "{{ vpc.vpc_id }}"
     cidr: "{{ public_subnet_cidr }}"
     tags:
-      Name: "publicsubnet"
+      Name: "{{ vpc_name }}-public-subnet"
   register: publicsubnet
 
 - name: VPC | Add internet gateway
@@ -58,4 +58,42 @@
     subnet_id: "{{ privatesubnet.subnet_id }}"
     wait: yes
     if_exists_do_not_create: true
-    
+
+- name: VPC | Create public security group
+  local_action:
+    module: ec2_group
+    name: "{{ item.sg_name }}"
+    description: "{{ item.sg_description }}"
+    vpc_id: "{{ vpc.vpc_id }}"
+    state: present
+    rules "{{ item.sg_rules }}"
+  with_items: "{{ public_security_groups }}"
+  register: publicsecuritygroup
+
+- name: VPC | Tag the public security group with a name
+  local_action:
+    module: ec2_tag
+    resource: "{{ item.group_id }}"
+    state: present
+    tags: 
+      Name: "{{ vpc_name }}-{{ item.item.sg_name }}"
+  with_items: "{{ publicsecuritygroup.results }}"
+
+- name: VPC | Save VPC ID in vars file
+  shell: echo "{{ vpc.vpc_id }}" > "{{ vpc_name }}-vpc.yml"
+  args:
+    chdir: roles/aws/vars/    
+
+- name: VPC | Save subnet IDs to vars file
+  shell: echo "{{ item.id }}" > "{{ item.tag.Name }}".yml
+  args:
+    chdir: roles/aws/vars/
+  with_items:
+    - "{{ publicsubnet }}"
+    - "{{ privatesubnet }}"
+
+- name: VPC | Set subnet IDs as facts
+  set_fact:
+    vpc_id: "{{ vpc.vpc_id }}"
+    public_subnet_id: "{{ publicsubnet.id }}"
+    private_subnet_id: "{{ privatesubnet.id }}"
