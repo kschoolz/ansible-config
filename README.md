@@ -7,7 +7,7 @@ Personal Ansible Collection
 - ansible
 - python
 
-I personally used the following setup:
+I personally use the following setup:
 
 ```
 $ ansible --version
