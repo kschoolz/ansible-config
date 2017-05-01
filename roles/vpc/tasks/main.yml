@@ -1,5 +1,5 @@
 ---
-- name: VPC | Create a AWS VPC inside mentioned region
+- name: Create a AWS VPC inside mentioned region
   ec2_vpc_net:
     name: "{{ vpc_name }}-vpc"
     region: "{{ vpc_region }}"
@@ -8,47 +8,40 @@
     tenancy: default
   register: vpc
 
-- name: VPC | Set up private subnet
+- name: Set up subnets
   ec2_vpc_subnet:
     state: present
     region: "{{ vpc_region }}"
     vpc_id: "{{ vpc.vpc.id }}"
-    cidr: "{{ private_cidr }}"
+    cidr: "{{ item.cidr }}"
     tags:
-      Name: "{{ vpc_name }}-privatesubnet"
-  register: privatesubnet
+      Name: "{{ vpc_name }}-{{ item.name }}"
+  with_items: "{{ vpc_subnets }}"
+  register: subnets
 
-- name: VPC | Set up public subnet
-  ec2_vpc_subnet:
-    state: present
-    region: "{{ vpc_region }}"
-    vpc_id: "{{ vpc.vpc.id }}"
-    cidr: "{{ public_cidr }}"
-    tags:
-      Name: "{{ vpc_name }}-publicsubnet"
-  register: publicsubnet
-
-- name: VPC | Add internet gateway
+- name: Add internet gateway
   ec2_vpc_igw:
     region: "{{ vpc_region }}"
     state: present
     vpc_id: "{{ vpc.vpc.id }}"
   register: igw
 
-- name: VPC | Add Public subnet route 
+- name: Add Public subnet(s) route 
   ec2_vpc_route_table:
     region: "{{ vpc_region }}"
     state: present
     vpc_id: "{{ vpc.vpc.id }}"
     tags:
       Name: "{{ vpc_name }}-public"
-    subnets: "{{ publicsubnet.subnet.id }}"
+    subnets: "{{ item.subnet.id }}"
     routes:
       - dest: 0.0.0.0/0
         gateway_id: "{{ igw.gateway_id }}"
+  with_items: "{{ subnets.results }}"
+  when: '"public" in item.subnet.tags.Name'
   register: publicroutetable
 
-- name: VPC | Tag the internet gateway
+- name: Tag the internet gateway
   ec2_tag:
     region: "{{ vpc_region }}"
     resource: "{{ igw.gateway_id }}"
@@ -56,37 +49,31 @@
     tags:
       Name: "{{ vpc_name }}-igw"
 
-- name: VPC | Create NAT gateway
+- name: Create NAT gateway
   ec2_vpc_nat_gateway:
     region: "{{ vpc_region }}"
     state: present
-    subnet_id: "{{ privatesubnet.subnet.id }}"
+    subnet_id: "{{ item.subnet.id }}"
     wait: yes
     if_exist_do_not_create: True
+  with_items: "{{ subnets.results }}"
+  when: '"private" in item.subnet.tags.Name'
   register: natgateway 
 
-- name: VPC | Create .yml file inside the secret_vars directory
+- name: Create .yml file inside the secret_vars directory
   lineinfile:
     dest: "secret_vars/{{ vpc_name }}.yml"
     line: "---"
     create: yes
 
-- name: "VPC | Write vpc info to {{ vpc_name }}.yml file inside the secret_vars directory"
+- name: "Write vpc info to {{ vpc_name }}.yml file inside the secret_vars directory"
   lineinfile:
     dest: "secret_vars/{{ vpc_name }}.yml"
-    regexp: "^{{ item.regexp | upper }}"
-    line: "{{ item.regexp | upper }}: {{ '\"' + item.line + '\"' }}"
+    regexp: "^{{ item.regexp }}"
+    line: "{{ item.regexp }}: {{ '\"' + item.line + '\"' }}"
   with_items:
     - { regexp: 'vpc_id', line: '{{ vpc.vpc.id }}' }
     - { regexp: 'igw', line: '{{ igw.gateway_id }}' }
-    - { regexp: 'routetable_id', line: '{{ publicroutetable.route_table.id }}' }
-
-#- name: "VPC | Write subnets ids to {{ vpc_name }}.yml"
-#  lineinfile:
-#    dest: "secret_vars/{{ vpc_name }}.yml"
-#    regexp: "^{{ item.subnet.tags.Name | upper }}"
-#    line: "{{ item.subnet.tags.Name | upper }}: {{ '\"' + item.line + '\"' }}"
-#  with_items:
-#    - public_subnet
+    - { regexp: 'vpc_region', line: '{{ vpc_region }}' }
 
 - include_vars: "secret_vars/{{ vpc_name }}.yml"

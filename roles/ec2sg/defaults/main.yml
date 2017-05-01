@@ -1,0 +1,9 @@
+---
+ec2_security_groups:
+  - name: test-sg
+    description: "This sg is just a test sg"
+    rules:
+      - proto: tcp
+        from_port: 22
+        to_port: 22
+        cidr_ip: 0.0.0.0/0
